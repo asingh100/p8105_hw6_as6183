@@ -1,0 +1,63 @@
+---
+title: "p8105_hw6_as6183"
+output: github_document
+---
+# Problem 1
+```{r}
+library(tidyverse)
+
+data = read.csv("./data/homicide-data.csv")%>%
+  mutate(city_state = str_c(city,state,sep=", "),
+         solved = ifelse(disposition != "Closed by arrest",0,1))%>%
+  filter(city_state != "Dallas, TX" & city_state != "Phoenix, AZ" & city_state != "Kansas City, MO" & city_state != "Tulsa, AL")%>%
+  filter(victim_race == "Black" | victim_race == "White")%>%
+  mutate(victim_age = as.numeric(victim_age),
+         victim_race = fct_relevel(victim_race, "White"))
+
+glm_Bmore = data%>%
+  filter(city_state == "Baltimore, MD")%>%
+  glm(formula = solved~victim_age+victim_sex+victim_race,data = ., family=binomial)
+
+glm_Bmore%>%
+   broom::tidy() %>% 
+  mutate(OR = exp(estimate)) %>%
+  cbind(exp(confint(glm_Bmore)))%>%
+  rename(conf.low = `2.5 %`,
+         conf.high = `97.5 %`)%>%
+  select(term, log_OR = estimate, OR, p.value,conf.low,conf.high)%>% 
+  knitr::kable(digits = 3)
+
+glm_all =
+  data %>% 
+  nest(data = -city_state) %>% 
+  mutate(
+    models = map(data, ~ glm(formula = solved~victim_age+victim_sex+victim_race,data = .x, family=binomial)),
+    results = map(models, broom::tidy)) %>%
+  mutate(map_dfr(.x = models, .f = ~exp(confint(.x,'victim_raceBlack'))))%>% 
+  select(-data,-models)%>%
+  unnest(results)%>% 
+  mutate(OR = exp(estimate)) %>%
+  filter(term == "victim_raceBlack")%>%
+  rename(conf.low = `2.5 %`,
+         conf.high = `97.5 %`)%>%
+  select(city_state,term,OR, p.value,conf.low,conf.high) 
+
+glm_all%>%
+   ggplot(aes(x = reorder(city_state,OR), y = OR)) +
+   geom_bar(stat="identity", fill = "light blue", col = "white")+
+   geom_errorbar(aes(ymin = conf.low, ymax = conf.high))+
+   xlab("City")+
+   ylab("Odds Ratio for solving Homicides comparing Black to White Victims")+
+   ggtitle("Odds Ratio for Solving Homicides based on Victim's Race by City")+
+   theme(
+     axis.text.x = element_text
+     (
+       size=8,
+       angle=90,
+       vjust = 0.5, 
+       hjust = 1
+       ),
+     axis.title.y = element_text(size=8),
+     plot.title=element_text(size=11)
+         )
+```
