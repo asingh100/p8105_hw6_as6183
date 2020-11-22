@@ -78,7 +78,7 @@ Proposed Regression Model:
 ```{r}
 library(modelr)
 
-proposed_model = lm(bwt~frace+malform+mrace+fincome+smoken,data = data)
+proposed_model = lm(bwt~frace+malform+mrace+smoken,data = data)
 
 proposed_model%>% 
   broom::tidy() %>% 
@@ -103,11 +103,21 @@ cv_df =
 cv_df = 
   cv_df %>% 
   mutate(
-    proposed_model  = map(train, ~lm(bwt~frace+malform+mrace+fincome+smoken,data = .x)),
+    proposed_model  = map(train, ~lm(bwt~frace+malform+mrace+smoken,data = .x)),
     model_1  = map(train, ~lm(bwt~gaweeks+blength,data = .x)),
     model_2  = map(train, ~lm(bwt~bhead*blength+blength*babysex+bhead*babysex+bhead*babysex*blength,data = .x))) %>% 
   mutate(
     rmse_proposed = map2_dbl(proposed_model, test, ~rmse(model = .x, data = .y)),
     rmse_1 = map2_dbl(model_1, test, ~rmse(model = .x, data = .y)),
     rmse_2 = map2_dbl(model_2, test, ~rmse(model = .x, data = .y)))
+
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
 ```
