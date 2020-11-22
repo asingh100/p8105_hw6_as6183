@@ -61,3 +61,53 @@ glm_all%>%
      plot.title=element_text(size=11)
          )
 ```
+
+# Problem 2: 
+
+```{r}
+data = read.csv("./data/birthweight.csv")%>%
+  mutate(babysex = factor(babysex),
+         frace = factor(frace),
+         malform = factor(malform),
+         mrace = factor(mrace),
+         fincome = factor(fincome))
+```
+
+Proposed Regression Model:
+
+```{r}
+library(modelr)
+
+proposed_model = lm(bwt~frace+malform+mrace+fincome+smoken,data = data)
+
+proposed_model%>% 
+  broom::tidy() %>% 
+  select(term, estimate, p.value)%>%
+  knitr::kable(digits=3)
+
+data%>%
+  modelr::add_residuals(proposed_model)%>%
+  modelr::add_predictions(proposed_model)%>%
+  ggplot(aes(pred,resid))+geom_point()
+```
+
+**Description of Modeling Process and Graph:**
+
+```{r}
+cv_df = 
+  crossv_mc(data, 100)%>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+
+cv_df = 
+  cv_df %>% 
+  mutate(
+    proposed_model  = map(train, ~lm(bwt~frace+malform+mrace+fincome+smoken,data = .x)),
+    model_1  = map(train, ~lm(bwt~gaweeks+blength,data = .x)),
+    model_2  = map(train, ~lm(bwt~bhead*blength+blength*babysex+bhead*babysex+bhead*babysex*blength,data = .x))) %>% 
+  mutate(
+    rmse_proposed = map2_dbl(proposed_model, test, ~rmse(model = .x, data = .y)),
+    rmse_1 = map2_dbl(model_1, test, ~rmse(model = .x, data = .y)),
+    rmse_2 = map2_dbl(model_2, test, ~rmse(model = .x, data = .y)))
+```
