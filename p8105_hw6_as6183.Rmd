@@ -5,14 +5,16 @@ output: github_document
 # Problem 1
 ```{r}
 library(tidyverse)
-
-data = read.csv("./data/homicide-data.csv")%>%
-  mutate(city_state = str_c(city,state,sep=", "),
-         solved = ifelse(disposition != "Closed by arrest",0,1))%>%
+#reading in homicide data, perfoming data wrangling and cleaning
+data = read.csv("./data/homicide-data.csv")%>% 
+  mutate(city_state = str_c(city,state,sep=", "), 
+         solved = ifelse(disposition != "Closed by arrest",0,1))%>% 
   filter(city_state != "Dallas, TX" & city_state != "Phoenix, AZ" & city_state != "Kansas City, MO" & city_state != "Tulsa, AL")%>%
   filter(victim_race == "Black" | victim_race == "White")%>%
   mutate(victim_age = as.numeric(victim_age),
          victim_race = fct_relevel(victim_race, "White"))
+
+#glm only for baltimore
 
 glm_Bmore = data%>%
   filter(city_state == "Baltimore, MD")%>%
@@ -26,6 +28,8 @@ glm_Bmore%>%
          conf.high = `97.5 %`)%>%
   select(term, log_OR = estimate, OR, p.value,conf.low,conf.high)%>% 
   knitr::kable(digits = 3)
+
+#Glm for all cities in data set
 
 glm_all =
   data %>% 
@@ -41,6 +45,8 @@ glm_all =
   rename(conf.low = `2.5 %`,
          conf.high = `97.5 %`)%>%
   select(city_state,term,OR, p.value,conf.low,conf.high) 
+
+#plotting the distribution of OR values calculated from Glm model above
 
 glm_all%>%
    ggplot(aes(x = reorder(city_state,OR), y = OR)) +
@@ -62,9 +68,15 @@ glm_all%>%
          )
 ```
 
+**Comments on Odd Ratio Plot:**
+
+This plot shows the distribution of odd ratio by US Cities when comparing solving homicide cases when the victim is black to solving homicide cases when the victim is white. I found it very interesting that most cities have an Odds Ratio estimate of less than 1 which means that homicides where the victim is Black are solved with less frequency when compared to homicides where the victim is White. I also found it interesting that for cities that do have an Odds Ratio estimate above 1, the confidence interval is much larger and the interval contains numbers below 1 which indicates that the true Odds Ratio could be less than 1. This could be due to some of the cities that have a higher Odds Ratio such as Tampa, FL and Long Beach, CA having lower entries when compared to cities that have lower Odds Ratios such as Chicago, IL or Boston, MA. 
+
 # Problem 2: 
 
 ```{r}
+#reading and cleaning birthweight data 
+
 data = read.csv("./data/birthweight.csv")%>%
   mutate(babysex = factor(babysex),
          frace = factor(frace),
@@ -78,7 +90,7 @@ Proposed Regression Model:
 ```{r}
 library(modelr)
 
-proposed_model = lm(bwt~frace+malform+mrace+smoken,data = data)
+proposed_model = lm(bwt~frace+malform+mrace+smoken,data = data) #proposed model for determining birthweight
 
 proposed_model%>% 
   broom::tidy() %>% 
@@ -88,28 +100,36 @@ proposed_model%>%
 data%>%
   modelr::add_residuals(proposed_model)%>%
   modelr::add_predictions(proposed_model)%>%
-  ggplot(aes(pred,resid))+geom_point()
+  ggplot(aes(pred,resid))+geom_point() #adding residuals and predictions to model and graphing
 ```
 
-**Description of Modeling Process and Graph:**
+**Description of Modeling Process:**
+
+For the modeling process I wanted to adjust for variables that I thought would be important indicators of the baby's birthweight. The variables I chose to adjust for were father/mother's race because I know that baby's weight can vary drastically depending on their race, the presence of malformations that could affect weight because it says it could affect weight in the problem, and finally the average number of cigarettes smoked per day by the mother as that has been shown to affect the baby's health in numerous studies. 
 
 ```{r}
+#seperating data into partitions for testing each model to determine optimal one
+
 cv_df = 
   crossv_mc(data, 100)%>% 
   mutate(
     train = map(train, as_tibble),
     test = map(test, as_tibble))
 
+#calculating rmse for each model to compare them
+
 cv_df = 
   cv_df %>% 
   mutate(
     proposed_model  = map(train, ~lm(bwt~frace+malform+mrace+smoken,data = .x)),
     model_1  = map(train, ~lm(bwt~gaweeks+blength,data = .x)),
-    model_2  = map(train, ~lm(bwt~bhead*blength+blength*babysex+bhead*babysex+bhead*babysex*blength,data = .x))) %>% 
+    model_2  = map(train, ~lm(bwt~bhead*blength*babysex,data = .x))) %>% 
   mutate(
     rmse_proposed = map2_dbl(proposed_model, test, ~rmse(model = .x, data = .y)),
     rmse_1 = map2_dbl(model_1, test, ~rmse(model = .x, data = .y)),
     rmse_2 = map2_dbl(model_2, test, ~rmse(model = .x, data = .y)))
+
+#plotting rmse values for each model using a violin plot
 
 cv_df %>% 
   select(starts_with("rmse")) %>% 
@@ -122,10 +142,16 @@ cv_df %>%
   ggplot(aes(x = model, y = rmse)) + geom_violin()
 ```
 
+**Comments on Comparison of Models:**
+
+From the violin plot above we can see that my proposed model has a much larger error when compared to model 1 (using length at birth and gestational age as predictors) and model 2 (using head circumference, length, sex, and all interactions as predictors). The best model according to error is model 2 which has the lowest error of the three models. 
+
 # Problem 3:
 
 ```{r}
 library(rnoaa)
+
+#reading in data and cleaning
 
 weather_df = 
   rnoaa::meteo_pull_monitors(
@@ -139,6 +165,8 @@ weather_df =
     tmax = tmax / 10) %>%
   select(name, id, everything())
 
+#setting up bootstrap samples to generate r.squared and log(B0B1) values
+
 boot_sample = function(df) {
   sample_frac(df, replace = TRUE)
 }
@@ -148,6 +176,8 @@ boot_straps =
     strap_number = 1:5000,
     strap_sample = rerun(5000, boot_sample(weather_df))
   )
+
+#runnning bootstrap samples through model and extracting r.squared and log(B0B1) values 
 
 bootstrap_results = 
   boot_straps %>% 
@@ -164,6 +194,8 @@ bootstrap_results =
   mutate(log = log(`(Intercept)`*tmin))
 
 library(patchwork)
+
+# plotting distribution of r.squared (plot 1) and log(B0B1) [plot 2] values
 
 plot_1 = bootstrap_results%>%
    ggplot(aes(x = r.squared)) + 
@@ -185,15 +217,19 @@ plot_1 + plot_2
 
 **Explanation of R squared and log(B0B1) Results:**
 
+The distribution of values for R squared ranges from 0.877 to 0.939 and looks normally distributed. The distribution of values for log(B0B1) ranges from 1.915 to 2.096 and also looks approximately normally distributed. 
 
 **Calculating Confidence Intervals:**
 
 ```{r}
+
+#calculating confidence interval for r.squared
 confidence_r2 = bootstrap_results%>%
   summarize(
     ci_lower = quantile(r.squared,0.025), 
     ci_upper = quantile(r.squared,0.975))
 
+#calculating confidence interval for log(B0B1)
 confidence_log = bootstrap_results%>%
   summarize(
     ci_lower = quantile(log,0.025), 
