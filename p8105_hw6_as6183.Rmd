@@ -3,7 +3,7 @@ title: "p8105_hw6_as6183"
 output: github_document
 ---
 # Problem 1
-```{r}
+```{r, message = F, warning=FALSE}
 library(tidyverse)
 #reading in homicide data, perfoming data wrangling and cleaning
 data = read.csv("./data/homicide-data.csv")%>% 
@@ -74,7 +74,7 @@ This plot shows the distribution of odd ratio by US Cities when comparing solvin
 
 # Problem 2: 
 
-```{r}
+```{r message = F, warning=FALSE}
 #reading and cleaning birthweight data 
 
 data = read.csv("./data/birthweight.csv")%>%
@@ -87,7 +87,7 @@ data = read.csv("./data/birthweight.csv")%>%
 
 Proposed Regression Model:
 
-```{r}
+```{r message = F, warning=FALSE}
 library(modelr)
 
 proposed_model = lm(bwt~frace+malform+mrace+smoken,data = data) #proposed model for determining birthweight
@@ -100,14 +100,16 @@ proposed_model%>%
 data%>%
   modelr::add_residuals(proposed_model)%>%
   modelr::add_predictions(proposed_model)%>%
-  ggplot(aes(pred,resid))+geom_point() #adding residuals and predictions to model and graphing
+  ggplot(aes(pred,resid))+
+  geom_point()+
+  labs(x = "Fitted Values", y= "Residuals", title = "Residuals vs Fitted Values for Proposed Model")#adding residuals and predictions to model and graphing
 ```
 
 **Description of Modeling Process:**
 
-For the modeling process I wanted to adjust for variables that I thought would be important indicators of the baby's birthweight. The variables I chose to adjust for were father/mother's race because I know that baby's weight can vary drastically depending on their race, the presence of malformations that could affect weight because it says it could affect weight in the problem, and finally the average number of cigarettes smoked per day by the mother as that has been shown to affect the baby's health in numerous studies. 
+For the modeling process I wanted to adjust for variables that I thought would be important indicators of the baby's birthweight. The variables I chose to adjust for were father/mother's race because I know that baby's weight can vary drastically depending on their race [[1]](https://www.nature.com/articles/7210703#:~:text=Asian%2C%20Hispanic%20and%20Other%20male,weights%20than%20White%20female%20infants), the presence of malformations that could affect weight because it says it could affect weight in the problem, and finally the average number of cigarettes smoked per day by the mother as that has been shown to affect the baby's health in numerous studies [[2]](https://www.sciencedirect.com/science/article/abs/pii/S0002937816331374?via%3Dihub). 
 
-```{r}
+```{r message = F, warning=FALSE}
 #seperating data into partitions for testing each model to determine optimal one
 
 cv_df = 
@@ -148,7 +150,7 @@ From the violin plot above we can see that my proposed model has a much larger e
 
 # Problem 3:
 
-```{r}
+```{r message = F, warning=FALSE}
 library(rnoaa)
 
 #reading in data and cleaning
@@ -221,7 +223,7 @@ The distribution of values for R squared ranges from 0.877 to 0.939 and looks no
 
 **Calculating Confidence Intervals:**
 
-```{r}
+```{r message = F, warning=FALSE}
 
 #calculating confidence interval for r.squared
 confidence_r2 = bootstrap_results%>%
